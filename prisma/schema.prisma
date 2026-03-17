@@ -1,0 +1,122 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Familia {
+  id       String    @id @default(cuid())
+  nombre   String    @default("Mi Familia")
+  moneda   String    @default("ARS")
+  locale   String    @default("es-AR")
+  creadoEn DateTime  @default(now())
+
+  miembros Miembro[]
+}
+
+model Miembro {
+  id        String   @id @default(cuid())
+  familiaId String
+  nombre    String
+  rol       String   @default("contribuidor")
+  color     String   @default("#6366f1")
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+
+  familia  Familia   @relation(fields: [familiaId], references: [id])
+  ingresos Ingreso[]
+  gastos   Gasto[]
+}
+
+model Categoria {
+  id            String   @id @default(cuid())
+  nombre        String
+  icono         String   @default("💰")
+  color         String   @default("#94a3b8")
+  esSistema     Boolean  @default(false)
+  palabrasClave String   @default("[]")
+  creadoEn      DateTime @default(now())
+
+  gastos       Gasto[]
+  presupuestos Presupuesto[]
+}
+
+model Ingreso {
+  id            String   @id @default(cuid())
+  miembroId     String
+  concepto      String
+  monto         Float
+  fecha         DateTime
+  esRecurrente  Boolean  @default(false)
+  notas         String?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  miembro Miembro @relation(fields: [miembroId], references: [id])
+}
+
+model Gasto {
+  id                 String   @id @default(cuid())
+  miembroId          String
+  categoriaId        String
+  descripcion        String
+  monto              Float
+  fecha              DateTime
+  tipo               String   @default("CASUAL")
+  ticketImagen       String?
+  ticketTextoOcr     String?
+  categorizacionAuto Boolean  @default(false)
+  confianzaCategoria Float?
+  notas              String?
+  creadoEn           DateTime @default(now())
+  actualizadoEn      DateTime @updatedAt
+
+  miembro   Miembro   @relation(fields: [miembroId], references: [id])
+  categoria Categoria @relation(fields: [categoriaId], references: [id])
+  cuota     Cuota?
+}
+
+model Cuota {
+  id                String   @id @default(cuid())
+  gastoId           String   @unique
+  concepto          String
+  montoTotal        Float
+  montoCuota        Float
+  cuotaActual       Int
+  totalCuotas       Int
+  cuotasRestantes   Int
+  fechaInicio       DateTime
+  fechaProximaCuota DateTime
+  frecuencia        String   @default("MENSUAL")
+  activa            Boolean  @default(true)
+  notas             String?
+  creadoEn          DateTime @default(now())
+  actualizadoEn     DateTime @updatedAt
+
+  gasto Gasto @relation(fields: [gastoId], references: [id])
+}
+
+model Presupuesto {
+  id            String   @id @default(cuid())
+  categoriaId   String
+  monto         Float
+  mes           Int
+  anio          Int
+  alertaAlPct   Float    @default(0.80)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  categoria Categoria @relation(fields: [categoriaId], references: [id])
+
+  @@unique([categoriaId, mes, anio])
+}
+
+model Configuracion {
+  clave     String   @id
+  valor     String
+  updatedAt DateTime @updatedAt
+}
