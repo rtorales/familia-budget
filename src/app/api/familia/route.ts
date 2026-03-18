@@ -8,6 +8,6 @@ export async function GET() {
   const { user, error } = await requireSession()
   if (error) return error
 
-  const [fam] = db.select().from(familia).where(eq(familia.id, user.familiaId)).all()
+  const [fam] = await db.select().from(familia).where(eq(familia.id, user.familiaId))
   return NextResponse.json(fam ?? null)
 }

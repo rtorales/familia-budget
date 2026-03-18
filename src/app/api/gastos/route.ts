@@ -50,7 +50,7 @@ export async function GET(req: Request) {
   if (categoriaId) conditions.push(eq(gasto.categoriaId, categoriaId))
   if (tipo) conditions.push(eq(gasto.tipo, tipo))
 
-  const gastos = db.select({
+  const gastos = await db.select({
     id: gasto.id,
     descripcion: gasto.descripcion,
     monto: gasto.monto,
@@ -68,7 +68,6 @@ export async function GET(req: Request) {
     .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
     .where(and(...conditions))
     .orderBy(desc(gasto.fecha))
-    .all()
 
   return NextResponse.json(gastos)
 }
@@ -82,9 +81,8 @@ export async function POST(req: Request) {
     const data = GastoSchema.parse(body)
 
     // Verify member belongs to this family
-    const [mem] = db.select().from(miembro)
+    const [mem] = await db.select().from(miembro)
       .where(and(eq(miembro.id, data.miembroId), eq(miembro.familiaId, user.familiaId)))
-      .all()
     if (!mem) return NextResponse.json({ error: 'Miembro no válido' }, { status: 403 })
 
     let categoriaId = data.categoriaId
@@ -92,7 +90,7 @@ export async function POST(req: Request) {
     let confianzaCategoria: number | null = null
 
     if (!categoriaId) {
-      const cats = db.select().from(categoria).where(eq(categoria.familiaId, user.familiaId)).all()
+      const cats = await db.select().from(categoria).where(eq(categoria.familiaId, user.familiaId))
       const resultado = categorizarGasto(data.descripcion, cats)
       if (resultado) {
         categoriaId = resultado.categoriaId
@@ -107,7 +105,7 @@ export async function POST(req: Request) {
     if (!categoriaId) return NextResponse.json({ error: 'No se encontró categoría' }, { status: 400 })
 
     const gastoId = createId()
-    db.insert(gasto).values({
+    await db.insert(gasto).values({
       id: gastoId,
       miembroId: data.miembroId,
       categoriaId,
@@ -120,10 +118,10 @@ export async function POST(req: Request) {
       confianzaCategoria,
       creadoEn: new Date(),
       actualizadoEn: new Date(),
-    }).run()
+    })
 
     if (data.tipo === 'CUOTA' && data.cuota) {
-      db.insert(cuota).values({
+      await db.insert(cuota).values({
         id: createId(),
         gastoId,
         concepto: data.cuota.concepto,
@@ -139,10 +137,10 @@ export async function POST(req: Request) {
         notas: data.cuota.notas ?? null,
         creadoEn: new Date(),
         actualizadoEn: new Date(),
-      }).run()
+      })
     }
 
-    const [created] = db.select().from(gasto).where(eq(gasto.id, gastoId)).all()
+    const [created] = await db.select().from(gasto).where(eq(gasto.id, gastoId))
     return NextResponse.json(created, { status: 201 })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })

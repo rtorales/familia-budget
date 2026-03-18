@@ -16,7 +16,7 @@ export async function calcularAlertas(mes: number, anio: number, familiaId: stri
   const inicio = new Date(anio, mes - 1, 1)
   const fin = new Date(anio, mes, 0, 23, 59, 59)
 
-  const presupuestos = db.select({
+  const presupuestos = await db.select({
     id: presupuesto.id,
     categoriaId: presupuesto.categoriaId,
     monto: presupuesto.monto,
@@ -27,12 +27,11 @@ export async function calcularAlertas(mes: number, anio: number, familiaId: stri
     .from(presupuesto)
     .innerJoin(categoria, eq(presupuesto.categoriaId, categoria.id))
     .where(and(eq(presupuesto.mes, mes), eq(presupuesto.anio, anio), eq(presupuesto.familiaId, familiaId)))
-    .all()
 
   const alertas: AlertaPresupuesto[] = []
 
   for (const p of presupuestos) {
-    const [resultado] = db.select({ total: sum(gasto.monto) })
+    const [resultado] = await db.select({ total: sum(gasto.monto) })
       .from(gasto)
       .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
       .where(and(
@@ -41,7 +40,6 @@ export async function calcularAlertas(mes: number, anio: number, familiaId: stri
         lte(gasto.fecha, fin),
         eq(miembro.familiaId, familiaId),
       ))
-      .all()
 
     const totalGastado = Number(resultado?.total ?? 0)
     const porcentaje = totalGastado / p.monto

@@ -1,51 +1,47 @@
-import Database from 'better-sqlite3'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { Pool } from 'pg'
 import * as schema from '../src/lib/db/schema'
 import { familia, miembro, categoria, ingreso, gasto, cuota, presupuesto, configuracion } from '../src/lib/db/schema'
-import { mkdirSync } from 'fs'
-import path from 'path'
 import { createId } from '@paralleldrive/cuid2'
 import { sql } from 'drizzle-orm'
 
-const DB_PATH = path.join(process.cwd(), 'data', 'familia.db')
-mkdirSync(path.dirname(DB_PATH), { recursive: true })
-
-const sqlite = new Database(DB_PATH)
-sqlite.pragma('journal_mode = WAL')
-sqlite.pragma('foreign_keys = ON')
-const db = drizzle(sqlite, { schema })
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+})
+const db = drizzle(pool, { schema })
 
 async function main() {
   console.log('Sembrando datos de demostracion...')
 
   // Clean all tables
-  db.delete(configuracion).run()
-  db.delete(presupuesto).run()
-  db.delete(cuota).run()
-  db.delete(gasto).run()
-  db.delete(ingreso).run()
-  db.delete(categoria).run()
-  db.delete(miembro).run()
-  db.delete(familia).run()
+  await db.delete(configuracion)
+  await db.delete(presupuesto)
+  await db.delete(cuota)
+  await db.delete(gasto)
+  await db.delete(ingreso)
+  await db.delete(categoria)
+  await db.delete(miembro)
+  await db.delete(familia)
 
   // Create family
   const familiaId = createId()
-  db.insert(familia).values({
+  await db.insert(familia).values({
     id: familiaId,
     nombre: 'Los García',
     moneda: 'ARS',
     locale: 'es-AR',
     creadoEn: new Date(),
-  }).run()
+  })
 
   // Create members
   const carlosId = createId()
   const lauraId = createId()
 
-  db.insert(miembro).values([
+  await db.insert(miembro).values([
     { id: carlosId, familiaId, nombre: 'Carlos', rol: 'admin', color: '#6366f1', activo: true, creadoEn: new Date() },
     { id: lauraId, familiaId, nombre: 'Laura', rol: 'contribuidor', color: '#ec4899', activo: true, creadoEn: new Date() },
-  ]).run()
+  ])
 
   // Create categories
   const cats = [
@@ -61,7 +57,7 @@ async function main() {
     { id: createId(), nombre: 'Ropa y Calzado', icono: '👗', color: '#ec4899', esSistema: true, palabrasClave: JSON.stringify(['ropa', 'zapatillas', 'calzado', 'zara', 'indumentaria', 'zapatos']) },
   ]
 
-  db.insert(categoria).values(cats.map(c => ({ ...c, familiaId, creadoEn: new Date() }))).run()
+  await db.insert(categoria).values(cats.map(c => ({ ...c, familiaId, creadoEn: new Date() })))
 
   const [catAlimentacion, catTransporte, catSalud, catEducacion, catEntretenimiento, catServicios, catCuotas, catHogar, catSeguros] = cats
 
@@ -78,18 +74,18 @@ async function main() {
     const getMiembro = () => Math.random() > 0.5 ? carlosId : lauraId
 
     // INGRESOS
-    db.insert(ingreso).values([
+    await db.insert(ingreso).values([
       { id: createId(), miembroId: carlosId, concepto: 'Sueldo mensual', monto: rnd(450000), fecha: dia(5), esRecurrente: true, creadoEn: new Date(), actualizadoEn: new Date() },
       { id: createId(), miembroId: lauraId, concepto: 'Sueldo mensual', monto: rnd(380000), fecha: dia(7), esRecurrente: true, creadoEn: new Date(), actualizadoEn: new Date() },
       { id: createId(), miembroId: lauraId, concepto: 'Clases particulares', monto: rnd(55000), fecha: dia(25), esRecurrente: true, creadoEn: new Date(), actualizadoEn: new Date() },
-    ]).run()
+    ])
 
     if (Math.random() > 0.4) {
-      db.insert(ingreso).values({
+      await db.insert(ingreso).values({
         id: createId(), miembroId: carlosId, concepto: 'Trabajo freelance',
         monto: rnd(75000), fecha: dia(15 + Math.floor(Math.random() * 8)),
         esRecurrente: false, creadoEn: new Date(), actualizadoEn: new Date()
-      }).run()
+      })
     }
 
     // GASTOS - Alimentación
@@ -101,46 +97,46 @@ async function main() {
       { desc: 'Almacén La Esquina', monto: rnd(6500) },
     ]
     for (const item of alimentacionItems) {
-      db.insert(gasto).values({
+      await db.insert(gasto).values({
         id: createId(), miembroId: getMiembro(), categoriaId: catAlimentacion.id,
         descripcion: item.desc, monto: item.monto,
         fecha: dia(Math.floor(Math.random() * 27) + 1),
         tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.92,
         creadoEn: new Date(), actualizadoEn: new Date()
-      }).run()
+      })
     }
 
     // Transporte
-    db.insert(gasto).values([
+    await db.insert(gasto).values([
       { id: createId(), miembroId: carlosId, categoriaId: catTransporte.id, descripcion: 'Nafta YPF', monto: rnd(24000), fecha: dia(Math.floor(Math.random() * 10) + 1), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.95, creadoEn: new Date(), actualizadoEn: new Date() },
       { id: createId(), miembroId: carlosId, categoriaId: catTransporte.id, descripcion: 'Peaje Acceso Norte', monto: rnd(3800), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.85, creadoEn: new Date(), actualizadoEn: new Date() },
-    ]).run()
+    ])
     if (Math.random() > 0.5) {
-      db.insert(gasto).values({ id: createId(), miembroId: lauraId, categoriaId: catTransporte.id, descripcion: 'Uber - viaje trabajo', monto: rnd(3000), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.9, creadoEn: new Date(), actualizadoEn: new Date() }).run()
+      await db.insert(gasto).values({ id: createId(), miembroId: lauraId, categoriaId: catTransporte.id, descripcion: 'Uber - viaje trabajo', monto: rnd(3000), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.9, creadoEn: new Date(), actualizadoEn: new Date() })
     }
 
     // Servicios
-    db.insert(gasto).values([
+    await db.insert(gasto).values([
       { id: createId(), miembroId: carlosId, categoriaId: catServicios.id, descripcion: 'Factura Edenor', monto: rnd(19000), fecha: dia(10), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.98, creadoEn: new Date(), actualizadoEn: new Date() },
       { id: createId(), miembroId: carlosId, categoriaId: catServicios.id, descripcion: 'Metrogas', monto: rnd(13000), fecha: dia(12), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.98, creadoEn: new Date(), actualizadoEn: new Date() },
       { id: createId(), miembroId: lauraId, categoriaId: catServicios.id, descripcion: 'Internet Fibertel', monto: 8500, fecha: dia(8), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.99, creadoEn: new Date(), actualizadoEn: new Date() },
-    ]).run()
+    ])
 
     // Entretenimiento
-    db.insert(gasto).values({ id: createId(), miembroId: lauraId, categoriaId: catEntretenimiento.id, descripcion: 'Netflix', monto: 3200, fecha: dia(3), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.99, creadoEn: new Date(), actualizadoEn: new Date() }).run()
+    await db.insert(gasto).values({ id: createId(), miembroId: lauraId, categoriaId: catEntretenimiento.id, descripcion: 'Netflix', monto: 3200, fecha: dia(3), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.99, creadoEn: new Date(), actualizadoEn: new Date() })
     if (Math.random() > 0.4) {
-      db.insert(gasto).values({ id: createId(), miembroId: getMiembro(), categoriaId: catEntretenimiento.id, descripcion: 'Delivery PedidosYa', monto: rnd(9500), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.88, creadoEn: new Date(), actualizadoEn: new Date() }).run()
+      await db.insert(gasto).values({ id: createId(), miembroId: getMiembro(), categoriaId: catEntretenimiento.id, descripcion: 'Delivery PedidosYa', monto: rnd(9500), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.88, creadoEn: new Date(), actualizadoEn: new Date() })
     }
     if (Math.random() > 0.6) {
-      db.insert(gasto).values({ id: createId(), miembroId: getMiembro(), categoriaId: catEntretenimiento.id, descripcion: 'Restaurante familiar', monto: rnd(28000), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: false, creadoEn: new Date(), actualizadoEn: new Date() }).run()
+      await db.insert(gasto).values({ id: createId(), miembroId: getMiembro(), categoriaId: catEntretenimiento.id, descripcion: 'Restaurante familiar', monto: rnd(28000), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: false, creadoEn: new Date(), actualizadoEn: new Date() })
     }
 
     // Educación
-    db.insert(gasto).values({ id: createId(), miembroId: lauraId, categoriaId: catEducacion.id, descripcion: 'Cuota colegio privado', monto: 47000, fecha: dia(5), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.85, creadoEn: new Date(), actualizadoEn: new Date() }).run()
+    await db.insert(gasto).values({ id: createId(), miembroId: lauraId, categoriaId: catEducacion.id, descripcion: 'Cuota colegio privado', monto: 47000, fecha: dia(5), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.85, creadoEn: new Date(), actualizadoEn: new Date() })
 
     // Salud
     if (Math.random() > 0.4) {
-      db.insert(gasto).values({ id: createId(), miembroId: getMiembro(), categoriaId: catSalud.id, descripcion: 'Farmacia', monto: rnd(9500), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.92, creadoEn: new Date(), actualizadoEn: new Date() }).run()
+      await db.insert(gasto).values({ id: createId(), miembroId: getMiembro(), categoriaId: catSalud.id, descripcion: 'Farmacia', monto: rnd(9500), fecha: dia(Math.floor(Math.random() * 27) + 1), tipo: 'CASUAL', categorizacionAuto: true, confianzaCategoria: 0.92, creadoEn: new Date(), actualizadoEn: new Date() })
     }
 
     // PRESUPUESTOS
@@ -153,10 +149,10 @@ async function main() {
       { categoriaId: catEducacion.id, monto: 55000 },
     ]
     for (const p of presupuestosData) {
-      db.insert(presupuesto).values({
+      await db.insert(presupuesto).values({
         id: createId(), ...p, familiaId, mes, anio, alertaAlPct: 0.80,
         creadoEn: new Date(), actualizadoEn: new Date()
-      }).onConflictDoNothing().run()
+      }).onConflictDoNothing()
     }
   }
 
@@ -190,16 +186,16 @@ async function main() {
   for (let i = 0; i < cuotasData.length; i++) {
     const item = cuotasData[i]
     const gastoId = createId()
-    db.insert(gasto).values({
+    await db.insert(gasto).values({
       id: gastoId,
       ...item.gasto,
       categoriaId: item.gasto.descripcion.includes('Seguro') ? catSeguros.id : catCuotas.id,
       fecha: new Date(anioActual, mesActual - 1, 10 + i),
       tipo: 'CUOTA',
       creadoEn: new Date(), actualizadoEn: new Date()
-    }).run()
+    })
 
-    db.insert(cuota).values({
+    await db.insert(cuota).values({
       id: createId(),
       gastoId,
       ...item.cuota,
@@ -210,15 +206,15 @@ async function main() {
       activa: true,
       notas: (item.cuota as { notas?: string }).notas ?? null,
       creadoEn: new Date(), actualizadoEn: new Date()
-    }).run()
+    })
   }
 
   // CONFIGURACIÓN
-  db.insert(configuracion).values([
+  await db.insert(configuracion).values([
     { clave: 'familia_id', valor: familiaId, updatedAt: new Date() },
     { clave: 'moneda', valor: 'ARS', updatedAt: new Date() },
     { clave: 'familia_nombre', valor: 'Los García', updatedAt: new Date() },
-  ]).onConflictDoUpdate({ target: configuracion.clave, set: { valor: sql`excluded.valor` } }).run()
+  ]).onConflictDoUpdate({ target: configuracion.clave, set: { valor: sql`excluded.valor` } })
 
   console.log('Datos sembrados exitosamente!')
   console.log('   - Familia: Los García (Carlos + Laura)')
@@ -227,7 +223,7 @@ async function main() {
   console.log('   - 5 planes de cuotas activos')
   console.log('   - Presupuestos por categoría')
 
-  sqlite.close()
+  await pool.end()
 }
 
 main().catch(console.error)

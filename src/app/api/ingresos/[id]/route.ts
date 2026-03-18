@@ -9,14 +9,13 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   if (error) return error
 
   // Verify the ingreso belongs to the user's family
-  const [existing] = db.select({ id: ingreso.id })
+  const [existing] = await db.select({ id: ingreso.id })
     .from(ingreso)
     .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
     .where(and(eq(ingreso.id, params.id), eq(miembro.familiaId, user.familiaId)))
-    .all()
   if (!existing) return NextResponse.json({ error: 'No encontrado o no autorizado' }, { status: 404 })
 
-  db.delete(ingreso).where(eq(ingreso.id, params.id)).run()
+  await db.delete(ingreso).where(eq(ingreso.id, params.id))
   return NextResponse.json({ ok: true })
 }
 
@@ -25,15 +24,14 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   if (error) return error
 
   // Verify the ingreso belongs to the user's family
-  const [existing] = db.select({ id: ingreso.id })
+  const [existing] = await db.select({ id: ingreso.id })
     .from(ingreso)
     .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
     .where(and(eq(ingreso.id, params.id), eq(miembro.familiaId, user.familiaId)))
-    .all()
   if (!existing) return NextResponse.json({ error: 'No encontrado o no autorizado' }, { status: 404 })
 
   const body = await req.json()
-  db.update(ingreso).set({ ...body, fecha: new Date(body.fecha), actualizadoEn: new Date() }).where(eq(ingreso.id, params.id)).run()
-  const [updated] = db.select().from(ingreso).where(eq(ingreso.id, params.id)).all()
+  await db.update(ingreso).set({ ...body, fecha: new Date(body.fecha), actualizadoEn: new Date() }).where(eq(ingreso.id, params.id))
+  const [updated] = await db.select().from(ingreso).where(eq(ingreso.id, params.id))
   return NextResponse.json(updated)
 }

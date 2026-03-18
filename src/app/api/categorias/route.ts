@@ -8,9 +8,8 @@ export async function GET() {
   const { user, error } = await requireSession()
   if (error) return error
 
-  const categorias = db.select().from(categoria)
+  const categorias = await db.select().from(categoria)
     .where(eq(categoria.familiaId, user.familiaId))
     .orderBy(desc(categoria.esSistema), categoria.nombre)
-    .all()
   return NextResponse.json(categorias)
 }

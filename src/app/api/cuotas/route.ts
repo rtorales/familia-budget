@@ -8,7 +8,7 @@ export async function GET() {
   const { user, error } = await requireSession()
   if (error) return error
 
-  const cuotas = db.select({
+  const cuotas = await db.select({
     id: cuota.id,
     concepto: cuota.concepto,
     montoTotal: cuota.montoTotal,
@@ -30,7 +30,6 @@ export async function GET() {
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
     .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
     .where(and(eq(cuota.activa, true), eq(miembro.familiaId, user.familiaId)))
-    .all()
 
   return NextResponse.json(cuotas)
 }

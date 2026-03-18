@@ -16,31 +16,29 @@ export async function GET(req: Request) {
   const fin = new Date(anio, mes, 0, 23, 59, 59)
 
   // Total ingresos (filtered by family)
-  const [ingresoResult] = db.select({ total: sum(ingreso.monto) })
+  const [ingresoResult] = await db.select({ total: sum(ingreso.monto) })
     .from(ingreso)
     .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
     .where(and(gte(ingreso.fecha, inicio), lte(ingreso.fecha, fin), eq(miembro.familiaId, user.familiaId)))
-    .all()
   const totalIngresos = Number(ingresoResult?.total ?? 0)
 
   // Total gastos (filtered by family)
-  const [gastoResult] = db.select({ total: sum(gasto.monto) })
+  const [gastoResult] = await db.select({ total: sum(gasto.monto) })
     .from(gasto)
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
     .where(and(gte(gasto.fecha, inicio), lte(gasto.fecha, fin), eq(miembro.familiaId, user.familiaId)))
-    .all()
   const totalGastos = Number(gastoResult?.total ?? 0)
 
   // Cuotas activas (filtered by family via gasto→miembro)
-  const cuotasActivas = db.select({ id: cuota.id })
+  const cuotasActivasRows = await db.select({ id: cuota.id })
     .from(cuota)
     .innerJoin(gasto, eq(cuota.gastoId, gasto.id))
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
     .where(and(eq(cuota.activa, true), eq(miembro.familiaId, user.familiaId)))
-    .all().length
+  const cuotasActivas = cuotasActivasRows.length
 
   // Gastos por categoria (filtered by family)
-  const porCategoria = db.select({
+  const porCategoria = await db.select({
     categoriaId: gasto.categoriaId,
     nombre: categoria.nombre,
     icono: categoria.icono,
@@ -52,7 +50,6 @@ export async function GET(req: Request) {
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
     .where(and(gte(gasto.fecha, inicio), lte(gasto.fecha, fin), eq(miembro.familiaId, user.familiaId)))
     .groupBy(gasto.categoriaId)
-    .all()
 
   const gastosPorCategoria = porCategoria.map(pc => ({
     ...pc,

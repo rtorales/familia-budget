@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   const mes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : new Date().getMonth() + 1
   const anio = searchParams.get('anio') ? parseInt(searchParams.get('anio')!) : new Date().getFullYear()
 
-  const presupuestos = db.select({
+  const presupuestos = await db.select({
     id: presupuesto.id,
     categoriaId: presupuesto.categoriaId,
     monto: presupuesto.monto,
@@ -34,7 +34,6 @@ export async function GET(req: Request) {
     .from(presupuesto)
     .innerJoin(categoria, eq(presupuesto.categoriaId, categoria.id))
     .where(and(eq(presupuesto.mes, mes), eq(presupuesto.anio, anio), eq(presupuesto.familiaId, user.familiaId)))
-    .all()
 
   return NextResponse.json(presupuestos)
 }
@@ -48,11 +47,11 @@ export async function POST(req: Request) {
     const data = PresupuestoSchema.parse(body)
 
     const id = createId()
-    db.insert(presupuesto).values({ id, ...data, familiaId: user.familiaId, creadoEn: new Date(), actualizadoEn: new Date() })
+    await db.insert(presupuesto).values({ id, ...data, familiaId: user.familiaId, creadoEn: new Date(), actualizadoEn: new Date() })
       .onConflictDoUpdate({
         target: [presupuesto.categoriaId, presupuesto.mes, presupuesto.anio],
         set: { monto: data.monto, alertaAlPct: data.alertaAlPct, actualizadoEn: new Date() }
-      }).run()
+      })
 
     return NextResponse.json({ ok: true })
   } catch (err) {

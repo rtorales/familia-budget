@@ -9,15 +9,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { user, error } = await requireSession()
   if (error) return error
 
-  const [existingCuota] = db.select().from(cuota).where(eq(cuota.id, params.id)).all()
+  const [existingCuota] = await db.select().from(cuota).where(eq(cuota.id, params.id))
   if (!existingCuota) return NextResponse.json({ error: 'Cuota no encontrada' }, { status: 404 })
 
   // Verify cuota belongs to user's family via gasto→miembro→familiaId
-  const [parentGasto] = db.select({ id: gasto.id, miembroId: gasto.miembroId, categoriaId: gasto.categoriaId })
+  const [parentGasto] = await db.select({ id: gasto.id, miembroId: gasto.miembroId, categoriaId: gasto.categoriaId })
     .from(gasto)
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
     .where(and(eq(gasto.id, existingCuota.gastoId), eq(miembro.familiaId, user.familiaId)))
-    .all()
 
   if (!parentGasto) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
@@ -27,16 +26,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const nuevaFecha = new Date(existingCuota.fechaProximaCuota)
   nuevaFecha.setMonth(nuevaFecha.getMonth() + 1)
 
-  db.update(cuota).set({
+  await db.update(cuota).set({
     cuotaActual: nuevaCuotaActual,
     cuotasRestantes: existingCuota.totalCuotas - nuevaCuotaActual,
     fechaProximaCuota: nuevaFecha,
     activa: !terminada,
     actualizadoEn: new Date(),
-  }).where(eq(cuota.id, params.id)).run()
+  }).where(eq(cuota.id, params.id))
 
   if (!terminada) {
-    db.insert(gasto).values({
+    await db.insert(gasto).values({
       id: createId(),
       miembroId: parentGasto.miembroId,
       categoriaId: parentGasto.categoriaId,
@@ -47,7 +46,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       notas: 'Pago registrado automáticamente',
       creadoEn: new Date(),
       actualizadoEn: new Date(),
-    }).run()
+    })
   }
 
   return NextResponse.json({ ok: true, terminada, cuotaActual: nuevaCuotaActual })

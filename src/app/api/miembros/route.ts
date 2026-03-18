@@ -8,8 +8,7 @@ export async function GET() {
   const { user, error } = await requireSession()
   if (error) return error
 
-  const miembros = db.select().from(miembro)
+  const miembros = await db.select().from(miembro)
     .where(and(eq(miembro.familiaId, user.familiaId), eq(miembro.activo, true)))
-    .all()
   return NextResponse.json(miembros)
 }

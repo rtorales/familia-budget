@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   }
   if (miembroId) conditions.push(eq(ingreso.miembroId, miembroId))
 
-  const ingresos = db.select({
+  const ingresos = await db.select({
     id: ingreso.id,
     miembroId: ingreso.miembroId,
     concepto: ingreso.concepto,
@@ -48,7 +48,6 @@ export async function GET(req: Request) {
     .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
     .where(and(...conditions))
     .orderBy(desc(ingreso.fecha))
-    .all()
 
   return NextResponse.json(ingresos)
 }
@@ -62,20 +61,19 @@ export async function POST(req: Request) {
     const data = IngresoSchema.parse(body)
 
     // Verify the miembro belongs to this family
-    const [mem] = db.select().from(miembro)
+    const [mem] = await db.select().from(miembro)
       .where(and(eq(miembro.id, data.miembroId), eq(miembro.familiaId, user.familiaId)))
-      .all()
     if (!mem) return NextResponse.json({ error: 'Miembro no válido' }, { status: 403 })
 
     const id = createId()
-    db.insert(ingreso).values({
+    await db.insert(ingreso).values({
       id, ...data,
       fecha: new Date(data.fecha),
       creadoEn: new Date(),
       actualizadoEn: new Date(),
-    }).run()
+    })
 
-    const [created] = db.select().from(ingreso).where(eq(ingreso.id, id)).all()
+    const [created] = await db.select().from(ingreso).where(eq(ingreso.id, id))
     return NextResponse.json(created, { status: 201 })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })

@@ -16,11 +16,10 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const [user] = db
+        const [user] = await db
           .select()
           .from(usuario)
           .where(eq(usuario.email, credentials.email.toLowerCase()))
-          .all()
 
         if (!user) return null
 

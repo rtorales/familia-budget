@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   if (error) return error
 
   const { descripcion } = await req.json()
-  const categorias = db.select().from(categoria).where(eq(categoria.familiaId, user.familiaId)).all()
+  const categorias = await db.select().from(categoria).where(eq(categoria.familiaId, user.familiaId))
   const resultado = categorizarGasto(descripcion, categorias)
   return NextResponse.json(resultado)
 }

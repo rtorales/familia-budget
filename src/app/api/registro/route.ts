@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const data = RegistroSchema.parse(body)
 
     // Check if email already exists
-    const [existing] = db.select().from(usuario).where(eq(usuario.email, data.email.toLowerCase())).all()
+    const [existing] = await db.select().from(usuario).where(eq(usuario.email, data.email.toLowerCase()))
     if (existing) {
       return NextResponse.json({ error: 'El email ya está registrado' }, { status: 409 })
     }
@@ -49,42 +49,42 @@ export async function POST(req: Request) {
     const hoy = new Date()
 
     // Create familia
-    db.insert(familia).values({
+    await db.insert(familia).values({
       id: familiaId,
       nombre: data.familiaNombre,
       moneda: 'ARS',
       locale: 'es-AR',
       creadoEn: hoy,
-    }).run()
+    })
 
     // Create members
-    db.insert(miembro).values([
+    await db.insert(miembro).values([
       { id: miembro1Id, familiaId, nombre: data.miembro1Nombre, rol: 'admin', color: data.miembro1Color, activo: true, creadoEn: hoy },
       { id: miembro2Id, familiaId, nombre: data.miembro2Nombre, rol: 'contribuidor', color: data.miembro2Color, activo: true, creadoEn: hoy },
-    ]).run()
+    ])
 
     // Create user
-    db.insert(usuario).values({
+    await db.insert(usuario).values({
       id: usuarioId,
       email: data.email.toLowerCase(),
       passwordHash,
       nombre: data.nombre,
       familiaId,
       creadoEn: hoy,
-    }).run()
+    })
 
     // Create default categories
     const categoriaIds: Record<string, string> = {}
     for (const cat of CATEGORIAS_DEFAULT) {
       const catId = createId()
       categoriaIds[cat.nombre] = catId
-      db.insert(categoria).values({ id: catId, familiaId, ...cat, esSistema: true, creadoEn: hoy }).run()
+      await db.insert(categoria).values({ id: catId, familiaId, ...cat, esSistema: true, creadoEn: hoy })
     }
 
     // ─── 3 example records ────────────────────────────────────────────────────
 
     // 1. Ingreso de ejemplo
-    db.insert(ingreso).values({
+    await db.insert(ingreso).values({
       id: createId(),
       miembroId: miembro1Id,
       concepto: 'Sueldo mensual (ejemplo)',
@@ -94,10 +94,10 @@ export async function POST(req: Request) {
       notas: 'Este es un ingreso de ejemplo. Podés editarlo o eliminarlo.',
       creadoEn: hoy,
       actualizadoEn: hoy,
-    }).run()
+    })
 
     // 2. Gasto casual de ejemplo
-    db.insert(gasto).values({
+    await db.insert(gasto).values({
       id: createId(),
       miembroId: miembro1Id,
       categoriaId: categoriaIds['Alimentación'],
@@ -110,11 +110,11 @@ export async function POST(req: Request) {
       notas: 'Este es un gasto de ejemplo. Podés editarlo o eliminarlo.',
       creadoEn: hoy,
       actualizadoEn: hoy,
-    }).run()
+    })
 
     // 3. Gasto en cuotas de ejemplo
     const gastoEjemploId = createId()
-    db.insert(gasto).values({
+    await db.insert(gasto).values({
       id: gastoEjemploId,
       miembroId: miembro2Id,
       categoriaId: categoriaIds['Cuotas y Créditos'],
@@ -125,12 +125,12 @@ export async function POST(req: Request) {
       notas: 'Este es un gasto en cuotas de ejemplo.',
       creadoEn: hoy,
       actualizadoEn: hoy,
-    }).run()
+    })
 
     const proximoMes = new Date(hoy)
     proximoMes.setMonth(proximoMes.getMonth() + 1)
 
-    db.insert(cuota).values({
+    await db.insert(cuota).values({
       id: createId(),
       gastoId: gastoEjemploId,
       concepto: 'Celular Samsung (ejemplo)',
@@ -146,10 +146,10 @@ export async function POST(req: Request) {
       notas: 'Plan de ejemplo. Podés editarlo.',
       creadoEn: hoy,
       actualizadoEn: hoy,
-    }).run()
+    })
 
     // Presupuesto de ejemplo para Alimentación
-    db.insert(presupuesto).values({
+    await db.insert(presupuesto).values({
       id: createId(),
       familiaId,
       categoriaId: categoriaIds['Alimentación'],
@@ -159,7 +159,7 @@ export async function POST(req: Request) {
       alertaAlPct: 0.80,
       creadoEn: hoy,
       actualizadoEn: hoy,
-    }).run()
+    })
 
     return NextResponse.json({ ok: true, familiaId }, { status: 201 })
   } catch (error) {
