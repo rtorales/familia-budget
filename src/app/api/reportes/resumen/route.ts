@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
     .where(and(gte(gasto.fecha, inicio), lte(gasto.fecha, fin), eq(miembro.familiaId, user.familiaId)))
-    .groupBy(gasto.categoriaId)
+    .groupBy(gasto.categoriaId, categoria.nombre, categoria.icono, categoria.color)
 
   const gastosPorCategoria = porCategoria.map(pc => ({
     ...pc,
