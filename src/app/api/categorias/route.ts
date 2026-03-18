@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { categoria } from '@/lib/db/schema'
-import { desc } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
+import { requireSession } from '@/lib/session'
 
 export async function GET() {
-  const categorias = db.select().from(categoria).orderBy(desc(categoria.esSistema), categoria.nombre).all()
+  const { user, error } = await requireSession()
+  if (error) return error
+
+  const categorias = db.select().from(categoria)
+    .where(eq(categoria.familiaId, user.familiaId))
+    .orderBy(desc(categoria.esSistema), categoria.nombre)
+    .all()
   return NextResponse.json(categorias)
 }

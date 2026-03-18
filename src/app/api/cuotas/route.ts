@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cuota, gasto, miembro, categoria } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
+import { requireSession } from '@/lib/session'
 
 export async function GET() {
+  const { user, error } = await requireSession()
+  if (error) return error
+
   const cuotas = db.select({
     id: cuota.id,
     concepto: cuota.concepto,
@@ -25,7 +29,7 @@ export async function GET() {
     .innerJoin(gasto, eq(cuota.gastoId, gasto.id))
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
     .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
-    .where(eq(cuota.activa, true))
+    .where(and(eq(cuota.activa, true), eq(miembro.familiaId, user.familiaId)))
     .all()
 
   return NextResponse.json(cuotas)

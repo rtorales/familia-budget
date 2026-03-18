@@ -4,6 +4,7 @@ import { presupuesto, categoria } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { z } from 'zod'
 import { createId } from '@paralleldrive/cuid2'
+import { requireSession } from '@/lib/session'
 
 const PresupuestoSchema = z.object({
   categoriaId: z.string(),
@@ -14,6 +15,9 @@ const PresupuestoSchema = z.object({
 })
 
 export async function GET(req: Request) {
+  const { user, error } = await requireSession()
+  if (error) return error
+
   const { searchParams } = new URL(req.url)
   const mes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : new Date().getMonth() + 1
   const anio = searchParams.get('anio') ? parseInt(searchParams.get('anio')!) : new Date().getFullYear()
@@ -29,27 +33,30 @@ export async function GET(req: Request) {
   })
     .from(presupuesto)
     .innerJoin(categoria, eq(presupuesto.categoriaId, categoria.id))
-    .where(and(eq(presupuesto.mes, mes), eq(presupuesto.anio, anio)))
+    .where(and(eq(presupuesto.mes, mes), eq(presupuesto.anio, anio), eq(presupuesto.familiaId, user.familiaId)))
     .all()
 
   return NextResponse.json(presupuestos)
 }
 
 export async function POST(req: Request) {
+  const { user, error } = await requireSession()
+  if (error) return error
+
   try {
     const body = await req.json()
     const data = PresupuestoSchema.parse(body)
 
     const id = createId()
-    db.insert(presupuesto).values({ id, ...data, creadoEn: new Date(), actualizadoEn: new Date() })
+    db.insert(presupuesto).values({ id, ...data, familiaId: user.familiaId, creadoEn: new Date(), actualizadoEn: new Date() })
       .onConflictDoUpdate({
         target: [presupuesto.categoriaId, presupuesto.mes, presupuesto.anio],
         set: { monto: data.monto, alertaAlPct: data.alertaAlPct, actualizadoEn: new Date() }
       }).run()
 
     return NextResponse.json({ ok: true })
-  } catch (error) {
-    if (error instanceof z.ZodError) return NextResponse.json({ error: error.issues }, { status: 400 })
+  } catch (err) {
+    if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues }, { status: 400 })
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

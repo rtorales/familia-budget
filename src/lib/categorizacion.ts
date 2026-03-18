@@ -11,6 +11,7 @@ interface ResultadoCategorizacion {
 }
 
 // Default keywords fallback (used when no DB categories available)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const KEYWORDS_DEFAULT: Record<string, string[]> = {
   "Alimentación": ["supermercado", "carrefour", "dia", "coto", "verduleria", "verdulería", "panaderia", "panadería", "almacen", "almacén", "mercado", "walmart", "jumbo", "disco", "vea"],
   "Transporte": ["nafta", "ypf", "shell", "axion", "axión", "peaje", "tren", "subte", "remis", "uber", "cabify", "colectivo", "omnibus", "ómnibus", "combustible", "estacion de servicio"],

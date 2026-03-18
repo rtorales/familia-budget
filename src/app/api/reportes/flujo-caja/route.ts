@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { gasto, ingreso } from '@/lib/db/schema'
-import { and, gte, lte, sum } from 'drizzle-orm'
+import { gasto, ingreso, miembro } from '@/lib/db/schema'
+import { and, gte, lte, sum, eq } from 'drizzle-orm'
+import { requireSession } from '@/lib/session'
 
 export async function GET(req: Request) {
+  const { user, error } = await requireSession()
+  if (error) return error
+
   const { searchParams } = new URL(req.url)
   const mesesAtras = parseInt(searchParams.get('meses') ?? '6')
 
@@ -17,10 +21,17 @@ export async function GET(req: Request) {
     const inicio = new Date(anio, mes - 1, 1)
     const fin = new Date(anio, mes, 0, 23, 59, 59)
 
-    const [ing] = db.select({ total: sum(ingreso.monto) }).from(ingreso)
-      .where(and(gte(ingreso.fecha, inicio), lte(ingreso.fecha, fin))).all()
-    const [gas] = db.select({ total: sum(gasto.monto) }).from(gasto)
-      .where(and(gte(gasto.fecha, inicio), lte(gasto.fecha, fin))).all()
+    const [ing] = db.select({ total: sum(ingreso.monto) })
+      .from(ingreso)
+      .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
+      .where(and(gte(ingreso.fecha, inicio), lte(ingreso.fecha, fin), eq(miembro.familiaId, user.familiaId)))
+      .all()
+
+    const [gas] = db.select({ total: sum(gasto.monto) })
+      .from(gasto)
+      .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
+      .where(and(gte(gasto.fecha, inicio), lte(gasto.fecha, fin), eq(miembro.familiaId, user.familiaId)))
+      .all()
 
     const totalIngresos = Number(ing?.total ?? 0)
     const totalGastos = Number(gas?.total ?? 0)

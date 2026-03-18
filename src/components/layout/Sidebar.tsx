@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
+import useSWR from 'swr'
 import {
   LayoutDashboard,
   TrendingDown,
@@ -10,7 +12,8 @@ import {
   Camera,
   BarChart3,
   Settings,
-  Wallet
+  Wallet,
+  LogOut,
 } from 'lucide-react'
 
 const navItems = [
@@ -24,8 +27,13 @@ const navItems = [
   { href: '/configuracion', label: 'Configuración', icon: Settings },
 ]
 
+const fetcher = (url: string) => fetch(url).then(r => r.json())
+
 export default function Sidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const { data: miembros } = useSWR('/api/miembros', fetcher)
+  const { data: familia } = useSWR('/api/familia', fetcher)
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -37,7 +45,9 @@ export default function Sidebar() {
           </div>
           <div>
             <h1 className="font-bold text-gray-900 text-lg leading-tight">FamiliaBudget</h1>
-            <p className="text-xs text-gray-500">Los García</p>
+            <p className="text-xs text-gray-500 truncate max-w-[120px]">
+              {familia?.nombre ?? session?.user?.name ?? ''}
+            </p>
           </div>
         </div>
       </div>
@@ -64,19 +74,34 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Family members */}
-      <div className="p-4 border-t border-gray-200">
-        <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Miembros</p>
-        <div className="flex gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">C</div>
-            <span className="text-xs text-gray-600">Carlos</span>
+      {/* Family members + logout */}
+      <div className="p-4 border-t border-gray-200 space-y-3">
+        {miembros && miembros.length > 0 && (
+          <div>
+            <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Miembros</p>
+            <div className="flex flex-wrap gap-2">
+              {miembros.map((m: { id: string; nombre: string; color: string }) => (
+                <div key={m.id} className="flex items-center gap-1.5">
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                    style={{ background: m.color }}
+                  >
+                    {m.nombre.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-xs text-gray-600">{m.nombre}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2 ml-2">
-            <div className="w-7 h-7 rounded-full bg-pink-500 flex items-center justify-center text-white text-xs font-bold">L</div>
-            <span className="text-xs text-gray-600">Laura</span>
-          </div>
-        </div>
+        )}
+
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Cerrar sesión
+        </button>
       </div>
     </aside>
   )

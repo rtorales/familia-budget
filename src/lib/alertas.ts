@@ -1,5 +1,5 @@
 import { db } from './db'
-import { gasto, presupuesto, categoria } from './db/schema'
+import { gasto, presupuesto, categoria, miembro } from './db/schema'
 import { eq, and, gte, lte, sum } from 'drizzle-orm'
 
 export interface AlertaPresupuesto {
@@ -12,7 +12,7 @@ export interface AlertaPresupuesto {
   nivel: 'advertencia' | 'critico'
 }
 
-export async function calcularAlertas(mes: number, anio: number): Promise<AlertaPresupuesto[]> {
+export async function calcularAlertas(mes: number, anio: number, familiaId: string): Promise<AlertaPresupuesto[]> {
   const inicio = new Date(anio, mes - 1, 1)
   const fin = new Date(anio, mes, 0, 23, 59, 59)
 
@@ -26,7 +26,7 @@ export async function calcularAlertas(mes: number, anio: number): Promise<Alerta
   })
     .from(presupuesto)
     .innerJoin(categoria, eq(presupuesto.categoriaId, categoria.id))
-    .where(and(eq(presupuesto.mes, mes), eq(presupuesto.anio, anio)))
+    .where(and(eq(presupuesto.mes, mes), eq(presupuesto.anio, anio), eq(presupuesto.familiaId, familiaId)))
     .all()
 
   const alertas: AlertaPresupuesto[] = []
@@ -34,10 +34,12 @@ export async function calcularAlertas(mes: number, anio: number): Promise<Alerta
   for (const p of presupuestos) {
     const [resultado] = db.select({ total: sum(gasto.monto) })
       .from(gasto)
+      .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
       .where(and(
         eq(gasto.categoriaId, p.categoriaId),
         gte(gasto.fecha, inicio),
         lte(gasto.fecha, fin),
+        eq(miembro.familiaId, familiaId),
       ))
       .all()
 

@@ -4,6 +4,7 @@ import { ingreso, miembro } from '@/lib/db/schema'
 import { eq, and, gte, lte, desc } from 'drizzle-orm'
 import { z } from 'zod'
 import { createId } from '@paralleldrive/cuid2'
+import { requireSession } from '@/lib/session'
 
 const IngresoSchema = z.object({
   miembroId: z.string(),
@@ -15,12 +16,15 @@ const IngresoSchema = z.object({
 })
 
 export async function GET(req: Request) {
+  const { user, error } = await requireSession()
+  if (error) return error
+
   const { searchParams } = new URL(req.url)
   const mes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : null
   const anio = searchParams.get('anio') ? parseInt(searchParams.get('anio')!) : null
   const miembroId = searchParams.get('miembroId')
 
-  const conditions = []
+  const conditions = [eq(miembro.familiaId, user.familiaId)]
 
   if (mes && anio) {
     const inicio = new Date(anio, mes - 1, 1)
@@ -38,15 +42,11 @@ export async function GET(req: Request) {
     esRecurrente: ingreso.esRecurrente,
     notas: ingreso.notas,
     creadoEn: ingreso.creadoEn,
-    miembro: {
-      id: miembro.id,
-      nombre: miembro.nombre,
-      color: miembro.color,
-    }
+    miembro: { id: miembro.id, nombre: miembro.nombre, color: miembro.color },
   })
     .from(ingreso)
     .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(ingreso.fecha))
     .all()
 
@@ -54,14 +54,22 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const { user, error } = await requireSession()
+  if (error) return error
+
   try {
     const body = await req.json()
     const data = IngresoSchema.parse(body)
 
+    // Verify the miembro belongs to this family
+    const [mem] = db.select().from(miembro)
+      .where(and(eq(miembro.id, data.miembroId), eq(miembro.familiaId, user.familiaId)))
+      .all()
+    if (!mem) return NextResponse.json({ error: 'Miembro no válido' }, { status: 403 })
+
     const id = createId()
     db.insert(ingreso).values({
-      id,
-      ...data,
+      id, ...data,
       fecha: new Date(data.fecha),
       creadoEn: new Date(),
       actualizadoEn: new Date(),
@@ -69,10 +77,8 @@ export async function POST(req: Request) {
 
     const [created] = db.select().from(ingreso).where(eq(ingreso.id, id)).all()
     return NextResponse.json(created, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
+  } catch (err) {
+    if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

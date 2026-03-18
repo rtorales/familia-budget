@@ -61,7 +61,7 @@ async function main() {
     { id: createId(), nombre: 'Ropa y Calzado', icono: '👗', color: '#ec4899', esSistema: true, palabrasClave: JSON.stringify(['ropa', 'zapatillas', 'calzado', 'zara', 'indumentaria', 'zapatos']) },
   ]
 
-  db.insert(categoria).values(cats.map(c => ({ ...c, creadoEn: new Date() }))).run()
+  db.insert(categoria).values(cats.map(c => ({ ...c, familiaId, creadoEn: new Date() }))).run()
 
   const [catAlimentacion, catTransporte, catSalud, catEducacion, catEntretenimiento, catServicios, catCuotas, catHogar, catSeguros] = cats
 
@@ -154,7 +154,7 @@ async function main() {
     ]
     for (const p of presupuestosData) {
       db.insert(presupuesto).values({
-        id: createId(), ...p, mes, anio, alertaAlPct: 0.80,
+        id: createId(), ...p, familiaId, mes, anio, alertaAlPct: 0.80,
         creadoEn: new Date(), actualizadoEn: new Date()
       }).onConflictDoNothing().run()
     }

@@ -38,6 +38,7 @@ export const miembroRelations = relations(miembro, ({ one, many }) => ({
 
 export const categoria = sqliteTable('categoria', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
+  familiaId: text('familia_id').notNull().references(() => familia.id),
   nombre: text('nombre').notNull(),
   icono: text('icono').notNull().default('💰'),
   color: text('color').notNull().default('#94a3b8'),
@@ -122,6 +123,7 @@ export const cuotaRelations = relations(cuota, ({ one }) => ({
 
 export const presupuesto = sqliteTable('presupuesto', {
   id: text('id').primaryKey().$defaultFn(() => createId()),
+  familiaId: text('familia_id').notNull().references(() => familia.id),
   categoriaId: text('categoria_id').notNull().references(() => categoria.id),
   monto: real('monto').notNull(),
   mes: integer('mes').notNull(),
@@ -142,3 +144,18 @@ export const configuracion = sqliteTable('configuracion', {
   valor: text('valor').notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 })
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+export const usuario = sqliteTable('usuario', {
+  id: text('id').primaryKey().$defaultFn(() => createId()),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  nombre: text('nombre').notNull(),
+  familiaId: text('familia_id').notNull().references(() => familia.id),
+  creadoEn: integer('creado_en', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+})
+
+export const usuarioRelations = relations(usuario, ({ one }) => ({
+  familia: one(familia, { fields: [usuario.familiaId], references: [familia.id] }),
+}))

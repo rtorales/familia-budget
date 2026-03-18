@@ -12,7 +12,7 @@ const IngresoFormSchema = z.object({
   monto: z.string().min(1, 'Requerido'),
   fecha: z.string().min(1, 'Requerido'),
   miembroId: z.string().min(1, 'Requerido'),
-  esRecurrente: z.boolean().default(false),
+  esRecurrente: z.boolean(),
   notas: z.string().optional(),
 })
 

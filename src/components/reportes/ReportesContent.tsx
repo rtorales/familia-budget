@@ -132,7 +132,7 @@ export default function ReportesContent() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(v: number | string) => formatearMoneda(Number(v))} />
+                    <Tooltip formatter={(v) => formatearMoneda(Number(v ?? 0))} />
                     <Legend />
                     <Bar dataKey="ingresos" name="Ingresos" fill="#6366f1" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="gastos" name="Gastos" fill="#f87171" radius={[4, 4, 0, 0]} />
@@ -160,7 +160,7 @@ export default function ReportesContent() {
                           <Cell key={index} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v: number | string) => formatearMoneda(Number(v))} />
+                      <Tooltip formatter={(v) => formatearMoneda(Number(v ?? 0))} />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
@@ -208,7 +208,7 @@ export default function ReportesContent() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v: number | string) => formatearMoneda(Number(v))} />
+                  <Tooltip formatter={(v) => formatearMoneda(Number(v ?? 0))} />
                   <Legend />
                   <Line
                     type="monotone"

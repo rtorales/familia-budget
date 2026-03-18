@@ -37,12 +37,6 @@ interface CuotaItem {
   fechaProximaCuota: string
 }
 
-interface CategoriaTotales {
-  nombre: string
-  total: number
-  porcentaje: number
-}
-
 export default function DashboardContent() {
   const hoy = new Date()
   const mes = hoy.getMonth() + 1
@@ -154,7 +148,7 @@ export default function DashboardContent() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v: number | string) => formatearMoneda(Number(v))} />
+              <Tooltip formatter={(v) => formatearMoneda(Number(v ?? 0))} />
               <Legend />
               <Bar dataKey="ingresos" name="Ingresos" fill="#6366f1" radius={[4, 4, 0, 0]} />
               <Bar dataKey="gastos" name="Gastos" fill="#f87171" radius={[4, 4, 0, 0]} />
@@ -174,14 +168,15 @@ export default function DashboardContent() {
                   nameKey="nombre"
                   cx="50%" cy="50%"
                   outerRadius={80}
-                  label={({ nombre, porcentaje }: CategoriaTotales) => `${nombre} ${Math.round(porcentaje * 100)}%`}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  label={({ nombre, porcentaje }: any) => `${nombre} ${Math.round((porcentaje ?? 0) * 100)}%`}
                   labelLine={false}
                 >
                   {resumen.gastosPorCategoria.map((_: unknown, index: number) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number | string) => formatearMoneda(Number(v))} />
+                <Tooltip formatter={(v) => formatearMoneda(Number(v ?? 0))} />
               </PieChart>
             </ResponsiveContainer>
           ) : (

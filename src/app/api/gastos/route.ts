@@ -5,6 +5,7 @@ import { eq, and, gte, lte, desc } from 'drizzle-orm'
 import { z } from 'zod'
 import { createId } from '@paralleldrive/cuid2'
 import { categorizarGasto } from '@/lib/categorizacion'
+import { requireSession } from '@/lib/session'
 
 const CuotaSchema = z.object({
   concepto: z.string(),
@@ -30,6 +31,9 @@ const GastoSchema = z.object({
 })
 
 export async function GET(req: Request) {
+  const { user, error } = await requireSession()
+  if (error) return error
+
   const { searchParams } = new URL(req.url)
   const mes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : null
   const anio = searchParams.get('anio') ? parseInt(searchParams.get('anio')!) : null
@@ -37,11 +41,10 @@ export async function GET(req: Request) {
   const categoriaId = searchParams.get('categoriaId')
   const tipo = searchParams.get('tipo')
 
-  const conditions = []
+  const conditions = [eq(miembro.familiaId, user.familiaId)]
   if (mes && anio) {
-    const inicio = new Date(anio, mes - 1, 1)
-    const fin = new Date(anio, mes, 0, 23, 59, 59)
-    conditions.push(gte(gasto.fecha, inicio), lte(gasto.fecha, fin))
+    conditions.push(gte(gasto.fecha, new Date(anio, mes - 1, 1)))
+    conditions.push(lte(gasto.fecha, new Date(anio, mes, 0, 23, 59, 59)))
   }
   if (miembroId) conditions.push(eq(gasto.miembroId, miembroId))
   if (categoriaId) conditions.push(eq(gasto.categoriaId, categoriaId))
@@ -63,7 +66,7 @@ export async function GET(req: Request) {
     .from(gasto)
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
     .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(gasto.fecha))
     .all()
 
@@ -71,17 +74,25 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const { user, error } = await requireSession()
+  if (error) return error
+
   try {
     const body = await req.json()
     const data = GastoSchema.parse(body)
 
-    // Auto-categorize if no category provided
+    // Verify member belongs to this family
+    const [mem] = db.select().from(miembro)
+      .where(and(eq(miembro.id, data.miembroId), eq(miembro.familiaId, user.familiaId)))
+      .all()
+    if (!mem) return NextResponse.json({ error: 'Miembro no válido' }, { status: 403 })
+
     let categoriaId = data.categoriaId
     let categorizacionAuto = false
     let confianzaCategoria: number | null = null
 
     if (!categoriaId) {
-      const cats = db.select().from(categoria).all()
+      const cats = db.select().from(categoria).where(eq(categoria.familiaId, user.familiaId)).all()
       const resultado = categorizarGasto(data.descripcion, cats)
       if (resultado) {
         categoriaId = resultado.categoriaId
@@ -89,15 +100,17 @@ export async function POST(req: Request) {
         confianzaCategoria = resultado.confianza
       } else {
         const fallback = cats.find(c => c.nombre === 'Hogar') ?? cats[0]
-        categoriaId = fallback.id
+        categoriaId = fallback?.id
       }
     }
+
+    if (!categoriaId) return NextResponse.json({ error: 'No se encontró categoría' }, { status: 400 })
 
     const gastoId = createId()
     db.insert(gasto).values({
       id: gastoId,
       miembroId: data.miembroId,
-      categoriaId: categoriaId!,
+      categoriaId,
       descripcion: data.descripcion,
       monto: data.monto,
       fecha: new Date(data.fecha),
@@ -131,11 +144,9 @@ export async function POST(req: Request) {
 
     const [created] = db.select().from(gasto).where(eq(gasto.id, gastoId)).all()
     return NextResponse.json(created, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
-    console.error(error)
+  } catch (err) {
+    if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
+    console.error(err)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
