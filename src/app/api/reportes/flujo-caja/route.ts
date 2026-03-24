@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { gasto, ingreso, miembro } from '@/lib/db/schema'
+import { gasto, ingreso, miembro, categoria } from '@/lib/db/schema'
 import { and, gte, lte, sum, eq } from 'drizzle-orm'
 import { requireSession } from '@/lib/session'
 
@@ -26,19 +26,42 @@ export async function GET(req: Request) {
       .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
       .where(and(gte(ingreso.fecha, inicio), lte(ingreso.fecha, fin), eq(miembro.familiaId, user.familiaId)))
 
+    // Only EJECUTADO, non-saving gastos for the chart (real operational expenses)
     const [gas] = await db.select({ total: sum(gasto.monto) })
       .from(gasto)
       .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
-      .where(and(gte(gasto.fecha, inicio), lte(gasto.fecha, fin), eq(miembro.familiaId, user.familiaId)))
+      .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
+      .where(and(
+        gte(gasto.fecha, inicio),
+        lte(gasto.fecha, fin),
+        eq(miembro.familiaId, user.familiaId),
+        eq(gasto.estado, 'EJECUTADO'),
+        eq(categoria.esSaving, false),
+      ))
+
+    // Ahorros separately
+    const [aho] = await db.select({ total: sum(gasto.monto) })
+      .from(gasto)
+      .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
+      .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
+      .where(and(
+        gte(gasto.fecha, inicio),
+        lte(gasto.fecha, fin),
+        eq(miembro.familiaId, user.familiaId),
+        eq(gasto.estado, 'EJECUTADO'),
+        eq(categoria.esSaving, true),
+      ))
 
     const totalIngresos = Number(ing?.total ?? 0)
     const totalGastos = Number(gas?.total ?? 0)
+    const totalAhorros = Number(aho?.total ?? 0)
 
     datos.push({
       mes: fecha.toLocaleString('es-AR', { month: 'short', year: '2-digit' }),
       ingresos: totalIngresos,
       gastos: totalGastos,
-      balance: totalIngresos - totalGastos,
+      ahorros: totalAhorros,
+      balance: totalIngresos - totalGastos - totalAhorros,
     })
   }
 

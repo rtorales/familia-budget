@@ -26,6 +26,7 @@ const GastoSchema = z.object({
   monto: z.number().positive(),
   fecha: z.string(),
   tipo: z.enum(['CASUAL', 'CUOTA']).default('CASUAL'),
+  estado: z.enum(['EJECUTADO', 'PROYECTADO']).default('EJECUTADO'),
   notas: z.string().optional(),
   cuota: CuotaSchema.optional(),
 })
@@ -40,6 +41,7 @@ export async function GET(req: Request) {
   const miembroId = searchParams.get('miembroId')
   const categoriaId = searchParams.get('categoriaId')
   const tipo = searchParams.get('tipo')
+  const estado = searchParams.get('estado') // 'EJECUTADO' | 'PROYECTADO' | null (all)
 
   const conditions = [eq(miembro.familiaId, user.familiaId)]
   if (mes && anio) {
@@ -49,6 +51,7 @@ export async function GET(req: Request) {
   if (miembroId) conditions.push(eq(gasto.miembroId, miembroId))
   if (categoriaId) conditions.push(eq(gasto.categoriaId, categoriaId))
   if (tipo) conditions.push(eq(gasto.tipo, tipo))
+  if (estado) conditions.push(eq(gasto.estado, estado))
 
   const gastos = await db.select({
     id: gasto.id,
@@ -56,12 +59,13 @@ export async function GET(req: Request) {
     monto: gasto.monto,
     fecha: gasto.fecha,
     tipo: gasto.tipo,
+    estado: gasto.estado,
     categorizacionAuto: gasto.categorizacionAuto,
     confianzaCategoria: gasto.confianzaCategoria,
     notas: gasto.notas,
     creadoEn: gasto.creadoEn,
     miembro: { id: miembro.id, nombre: miembro.nombre, color: miembro.color },
-    categoria: { id: categoria.id, nombre: categoria.nombre, icono: categoria.icono, color: categoria.color },
+    categoria: { id: categoria.id, nombre: categoria.nombre, icono: categoria.icono, color: categoria.color, esSaving: categoria.esSaving },
   })
     .from(gasto)
     .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
@@ -113,6 +117,7 @@ export async function POST(req: Request) {
       monto: data.monto,
       fecha: new Date(data.fecha),
       tipo: data.tipo,
+      estado: data.estado,
       notas: data.notas ?? null,
       categorizacionAuto,
       confianzaCategoria,

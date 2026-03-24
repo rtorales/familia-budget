@@ -39,6 +39,7 @@ export async function calcularAlertas(mes: number, anio: number, familiaId: stri
         gte(gasto.fecha, inicio),
         lte(gasto.fecha, fin),
         eq(miembro.familiaId, familiaId),
+        eq(gasto.estado, 'EJECUTADO'),
       ))
 
     const totalGastado = Number(resultado?.total ?? 0)

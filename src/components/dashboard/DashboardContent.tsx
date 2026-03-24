@@ -1,7 +1,7 @@
 'use client'
 import useSWR from 'swr'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, CreditCard, AlertTriangle, Clock } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, CreditCard, AlertTriangle, Clock, PiggyBank, Clock3 } from 'lucide-react'
 import { formatearMoneda, formatearFecha } from '@/lib/formatters'
 import Link from 'next/link'
 
@@ -22,6 +22,7 @@ interface GastoItem {
   categoria: { icono: string; nombre: string; color: string }
   descripcion: string
   categorizacionAuto: boolean
+  estado: string
   miembro: { nombre: string; color: string }
   fecha: string
   monto: number
@@ -50,8 +51,8 @@ export default function DashboardContent() {
 
   if (!resumen || !flujoCaja) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[...Array(6)].map((_, i) => (
           <div key={i} className="bg-white rounded-xl p-6 animate-pulse h-32 border border-gray-100" />
         ))}
       </div>
@@ -66,22 +67,43 @@ export default function DashboardContent() {
       color: 'text-green-600',
       bg: 'bg-green-50',
       border: 'border-green-100',
+      sub: null,
     },
     {
-      label: 'Gastos del Mes',
+      label: 'Gastos Operativos',
       value: formatearMoneda(resumen.totalGastos),
       icon: TrendingDown,
       color: 'text-red-500',
       bg: 'bg-red-50',
       border: 'border-red-100',
+      sub: null,
     },
     {
-      label: 'Balance',
-      value: formatearMoneda(resumen.balance),
+      label: 'Saldo Líquido',
+      value: formatearMoneda(resumen.saldoLiquido),
       icon: Wallet,
-      color: resumen.balance >= 0 ? 'text-indigo-600' : 'text-red-600',
-      bg: resumen.balance >= 0 ? 'bg-indigo-50' : 'bg-red-50',
-      border: resumen.balance >= 0 ? 'border-indigo-100' : 'border-red-100',
+      color: resumen.saldoLiquido >= 0 ? 'text-indigo-600' : 'text-red-600',
+      bg: resumen.saldoLiquido >= 0 ? 'bg-indigo-50' : 'bg-red-50',
+      border: resumen.saldoLiquido >= 0 ? 'border-indigo-100' : 'border-red-100',
+      sub: 'Disponible en cuenta',
+    },
+    {
+      label: 'Ahorros / Inversiones',
+      value: formatearMoneda(resumen.totalAhorros),
+      icon: PiggyBank,
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-100',
+      sub: 'Fondos mutuos y ahorros',
+    },
+    {
+      label: 'Comprometido',
+      value: formatearMoneda(resumen.totalProyectado),
+      icon: Clock3,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
+      border: 'border-amber-100',
+      sub: 'Gastos proyectados pendientes',
     },
     {
       label: 'Cuotas Activas',
@@ -90,6 +112,7 @@ export default function DashboardContent() {
       color: 'text-orange-600',
       bg: 'bg-orange-50',
       border: 'border-orange-100',
+      sub: null,
     },
   ]
 
@@ -120,19 +143,20 @@ export default function DashboardContent() {
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards — 3 columns */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {kpis.map((kpi) => {
           const Icon = kpi.icon
           return (
             <div key={kpi.label} className={`bg-white rounded-xl p-5 border ${kpi.border} shadow-sm`}>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-gray-500">{kpi.label}</p>
                 <div className={`${kpi.bg} p-2 rounded-lg`}>
                   <Icon className={`w-4 h-4 ${kpi.color}`} />
                 </div>
               </div>
               <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
+              {kpi.sub && <p className="text-xs text-gray-400 mt-1">{kpi.sub}</p>}
             </div>
           )
         })}
@@ -144,7 +168,7 @@ export default function DashboardContent() {
         <div className="lg:col-span-2 bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
           <h2 className="font-semibold text-gray-900 mb-4">Flujo de Caja (últimos 6 meses)</h2>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={flujoCaja} barGap={4}>
+            <BarChart data={flujoCaja} barGap={2}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
@@ -152,6 +176,7 @@ export default function DashboardContent() {
               <Legend />
               <Bar dataKey="ingresos" name="Ingresos" fill="#6366f1" radius={[4, 4, 0, 0]} />
               <Bar dataKey="gastos" name="Gastos" fill="#f87171" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ahorros" name="Ahorros" fill="#10b981" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -195,18 +220,25 @@ export default function DashboardContent() {
           </div>
           <div className="divide-y divide-gray-50">
             {(gastos ?? []).slice(0, 6).map((g: GastoItem) => (
-              <div key={g.id} className="px-5 py-3 flex items-center justify-between">
+              <div key={g.id} className={`px-5 py-3 flex items-center justify-between ${g.estado === 'PROYECTADO' ? 'opacity-60' : ''}`}>
                 <div className="flex items-center gap-3">
                   <span className="text-xl">{g.categoria.icono}</span>
                   <div>
-                    <p className="text-sm font-medium text-gray-800">{g.descripcion}</p>
+                    <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                      {g.descripcion}
+                      {g.estado === 'PROYECTADO' && (
+                        <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Pendiente</span>
+                      )}
+                    </p>
                     <p className="text-xs text-gray-400">
                       <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: g.miembro.color }} />
                       {g.miembro.nombre} · {formatearFecha(g.fecha)}
                     </p>
                   </div>
                 </div>
-                <span className="text-sm font-semibold text-red-600">-{formatearMoneda(g.monto)}</span>
+                <span className={`text-sm font-semibold ${g.estado === 'PROYECTADO' ? 'text-amber-500' : 'text-red-600'}`}>
+                  -{formatearMoneda(g.monto)}
+                </span>
               </div>
             ))}
             {(!gastos || gastos.length === 0) && (

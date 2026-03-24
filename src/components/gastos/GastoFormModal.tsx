@@ -15,6 +15,7 @@ const GastoFormSchema = z.object({
   miembroId: z.string().min(1, 'Requerido'),
   categoriaId: z.string().min(1, 'Requerido'),
   tipo: z.enum(['CASUAL', 'CUOTA']),
+  estado: z.enum(['EJECUTADO', 'PROYECTADO']),
   notas: z.string().optional(),
   cuotaConcepto: z.string().optional(),
   cuotaMontoTotal: z.string().optional(),
@@ -48,10 +49,12 @@ export default function GastoFormModal({ onClose, onSuccess }: Props) {
     defaultValues: {
       fecha: hoy,
       tipo: 'CASUAL',
+      estado: 'EJECUTADO',
     }
   })
 
   const tipo = watch('tipo')
+  const estado = watch('estado')
   const descripcion = watch('descripcion')
 
   // Auto-categorize on description change
@@ -84,6 +87,7 @@ export default function GastoFormModal({ onClose, onSuccess }: Props) {
       monto: parseFloat(data.monto),
       fecha: data.fecha,
       tipo: data.tipo,
+      estado: data.estado,
       notas: data.notas,
     }
 
@@ -189,15 +193,44 @@ export default function GastoFormModal({ onClose, onSuccess }: Props) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-            <div className="flex gap-4">
-              {(['CASUAL', 'CUOTA'] as const).map(t => (
-                <label key={t} className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" value={t} {...register('tipo')} className="text-indigo-600" />
-                  <span className="text-sm">{t === 'CASUAL' ? 'Gasto único' : 'En cuotas'}</span>
-                </label>
-              ))}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+              <div className="flex gap-4">
+                {(['CASUAL', 'CUOTA'] as const).map(t => (
+                  <label key={t} className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" value={t} {...register('tipo')} className="text-indigo-600" />
+                    <span className="text-sm">{t === 'CASUAL' ? 'Gasto único' : 'En cuotas'}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+              <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg w-fit">
+                <button
+                  type="button"
+                  onClick={() => setValue('estado', 'EJECUTADO')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    estado === 'EJECUTADO'
+                      ? 'bg-white text-green-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  ✓ Ejecutado
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setValue('estado', 'PROYECTADO')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    estado === 'PROYECTADO'
+                      ? 'bg-white text-amber-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  ⏳ Proyectado
+                </button>
+              </div>
             </div>
           </div>
 

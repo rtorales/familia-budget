@@ -43,6 +43,8 @@ export const categoria = pgTable('categoria', {
   icono: text('icono').notNull().default('💰'),
   color: text('color').notNull().default('#94a3b8'),
   esSistema: boolean('es_sistema').notNull().default(false),
+  // true = dinero reservado en fondo/inversión, se muestra separado de gastos operativos
+  esSaving: boolean('es_saving').notNull().default(false),
   palabrasClave: text('palabras_clave').notNull().default('[]'),
   creadoEn: timestamp('creado_en').$defaultFn(() => new Date()),
 })
@@ -80,6 +82,8 @@ export const gasto = pgTable('gasto', {
   monto: real('monto').notNull(),
   fecha: timestamp('fecha').notNull(),
   tipo: text('tipo').notNull().default('CASUAL'),
+  // 'EJECUTADO' = ya pagado | 'PROYECTADO' = comprometido pero pendiente
+  estado: text('estado').notNull().default('EJECUTADO'),
   ticketImagen: text('ticket_imagen'),
   ticketTextoOcr: text('ticket_texto_ocr'),
   categorizacionAuto: boolean('categorizacion_auto').notNull().default(false),
