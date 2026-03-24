@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { gasto, ingreso, cuota, categoria, miembro } from '@/lib/db/schema'
-import { eq, and, gte, lte, sum } from 'drizzle-orm'
+import { gasto, ingreso, cuota, categoria, miembro, configuracion } from '@/lib/db/schema'
+import { eq, and, gte, lte, sum, gt } from 'drizzle-orm'
 import { requireSession } from '@/lib/session'
 
 export async function GET(req: Request) {
@@ -51,6 +51,38 @@ export async function GET(req: Request) {
   // Saldo líquido = ingresos - gastos operativos ejecutados (ahorros are separate)
   const saldoLiquido = totalIngresos - totalGastos - totalAhorros
 
+  // ── Configuracion: saldo base y fondos mutuos ────────────────────────────────
+  const allCfg = await db.select().from(configuracion)
+  const cfgMap: Record<string, string> = {}
+  for (const row of allCfg) cfgMap[row.clave] = row.valor
+
+  const saldoLiquidoBase = cfgMap['saldo_liquido_base'] ? Number(cfgMap['saldo_liquido_base']) : null
+  const saldoFondosMutuos = cfgMap['saldo_fondos_mutuos'] ? Number(cfgMap['saldo_fondos_mutuos']) : null
+  const saldoBaseFecha = cfgMap['saldo_base_fecha'] ? new Date(cfgMap['saldo_base_fecha'] + 'T23:59:59') : null
+
+  // If we have a base balance, compute cumulative = base + transactions after base date
+  let saldoLiquidoReal = saldoLiquido
+  if (saldoLiquidoBase !== null && saldoBaseFecha !== null) {
+    const [ingAfter] = await db.select({ total: sum(ingreso.monto) })
+      .from(ingreso)
+      .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
+      .where(and(gt(ingreso.fecha, saldoBaseFecha), eq(miembro.familiaId, user.familiaId)))
+    const ingresoAfter = Number(ingAfter?.total ?? 0)
+
+    const gastosAfterRows = await db.select({ monto: gasto.monto, estado: gasto.estado, esSaving: categoria.esSaving })
+      .from(gasto)
+      .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
+      .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
+      .where(and(gt(gasto.fecha, saldoBaseFecha), eq(miembro.familiaId, user.familiaId), eq(gasto.estado, 'EJECUTADO')))
+
+    let gastosAfterOp = 0, ahorrosAfter = 0
+    for (const r of gastosAfterRows) {
+      if (r.esSaving) ahorrosAfter += r.monto
+      else gastosAfterOp += r.monto
+    }
+    saldoLiquidoReal = saldoLiquidoBase + ingresoAfter - gastosAfterOp - ahorrosAfter
+  }
+
   // Cuotas activas
   const cuotasActivasRows = await db.select({ id: cuota.id })
     .from(cuota)
@@ -88,11 +120,12 @@ export async function GET(req: Request) {
   return NextResponse.json({
     mes, anio,
     totalIngresos,
-    totalGastos,        // operativos ejecutados
-    totalAhorros,       // en inversiones/fondos
-    totalProyectado,    // comprometidos pendientes
-    saldoLiquido,       // ingresos - gastos - ahorros
-    balance: saldoLiquido, // kept for backward compat
+    totalGastos,           // operativos ejecutados este mes
+    totalAhorros,          // ahorros/inversiones este mes
+    totalProyectado,       // comprometidos pendientes este mes
+    saldoLiquido: saldoLiquidoReal,  // balance acumulado real
+    saldoFondosMutuos,     // balance fondos mutuos (stored in configuracion)
+    balance: saldoLiquidoReal, // kept for backward compat
     cuotasActivas,
     gastosPorCategoria,
   })
