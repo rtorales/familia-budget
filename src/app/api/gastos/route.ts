@@ -53,7 +53,7 @@ export async function GET(req: Request) {
   if (tipo) conditions.push(eq(gasto.tipo, tipo))
   if (estado) conditions.push(eq(gasto.estado, estado))
 
-  const gastos = await db.select({
+  const gastosDB = await db.select({
     id: gasto.id,
     descripcion: gasto.descripcion,
     monto: gasto.monto,
@@ -73,7 +73,68 @@ export async function GET(req: Request) {
     .where(and(...conditions))
     .orderBy(desc(gasto.fecha))
 
-  return NextResponse.json(gastos)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resultado: any[] = gastosDB.map(g => ({ ...g, virtual: false }))
+
+  // Para meses futuros, generar registros proyectados virtuales desde cuotas activas
+  const now = new Date()
+  const currentYM = now.getFullYear() * 12 + now.getMonth()
+  const targetYM = anio && mes ? anio * 12 + (mes - 1) : null
+  const esMesFuturo = targetYM !== null && targetYM > currentYM
+
+  if (esMesFuturo && estado !== 'EJECUTADO') {
+    const cuotasActivas = await db.select({
+      id: cuota.id,
+      concepto: cuota.concepto,
+      montoCuota: cuota.montoCuota,
+      cuotaActual: cuota.cuotaActual,
+      totalCuotas: cuota.totalCuotas,
+      fechaProximaCuota: cuota.fechaProximaCuota,
+      miembroId: miembro.id,
+      miembroNombre: miembro.nombre,
+      miembroColor: miembro.color,
+      categoriaId: categoria.id,
+      categoriaNombre: categoria.nombre,
+      categoriaIcono: categoria.icono,
+      categoriaColor: categoria.color,
+      esSaving: categoria.esSaving,
+    })
+      .from(cuota)
+      .innerJoin(gasto, eq(cuota.gastoId, gasto.id))
+      .innerJoin(miembro, eq(gasto.miembroId, miembro.id))
+      .innerJoin(categoria, eq(gasto.categoriaId, categoria.id))
+      .where(and(eq(cuota.activa, true), eq(miembro.familiaId, user.familiaId)))
+
+    for (const c of cuotasActivas) {
+      if (miembroId && c.miembroId !== miembroId) continue
+      const fpd = new Date(c.fechaProximaCuota)
+      const fpdYM = fpd.getFullYear() * 12 + fpd.getMonth()
+      const monthsDiff = targetYM! - fpdYM
+      if (monthsDiff < 0) continue
+      const cuotaInMonth = (c.cuotaActual + 1) + monthsDiff
+      if (cuotaInMonth > c.totalCuotas) continue
+
+      resultado.push({
+        id: `virtual-cuota-${c.id}-${mes}-${anio}`,
+        descripcion: `${c.concepto} (${cuotaInMonth}/${c.totalCuotas})`,
+        monto: c.montoCuota,
+        fecha: new Date(anio!, mes! - 1, fpd.getDate()),
+        tipo: 'CUOTA',
+        estado: 'PROYECTADO',
+        categorizacionAuto: false,
+        confianzaCategoria: null,
+        notas: null,
+        creadoEn: new Date(),
+        virtual: true,
+        miembro: { id: c.miembroId, nombre: c.miembroNombre, color: c.miembroColor },
+        categoria: { id: c.categoriaId, nombre: c.categoriaNombre, icono: c.categoriaIcono, color: c.categoriaColor, esSaving: c.esSaving },
+      })
+    }
+
+    resultado.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+  }
+
+  return NextResponse.json(resultado)
 }
 
 export async function POST(req: Request) {

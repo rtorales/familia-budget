@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import useSWR from 'swr'
-import { Plus, Filter } from 'lucide-react'
+import { Plus, Filter, TrendingUp } from 'lucide-react'
 import { formatearMoneda, formatearFecha } from '@/lib/formatters'
 import GastoFormModal from './GastoFormModal'
 
@@ -17,6 +17,17 @@ interface GastoRow {
   miembro: { nombre: string; color: string }
   fecha: string
   monto: number
+  virtual?: boolean
+}
+
+interface IngresoRow {
+  id: string
+  concepto: string
+  monto: number
+  fecha: string
+  esRecurrente: boolean
+  virtual?: boolean
+  miembro: { nombre: string; color: string }
 }
 
 interface MiembroOption {
@@ -36,10 +47,20 @@ export default function GastosContent() {
   if (miembroFiltro) params.set('miembroId', miembroFiltro)
   if (estadoFiltro) params.set('estado', estadoFiltro)
 
+  const ingresosParams = new URLSearchParams({ mes: String(mes), anio: String(anio) })
+  if (miembroFiltro) ingresosParams.set('miembroId', miembroFiltro)
+
   const { data: gastos, mutate } = useSWR(`/api/gastos?${params}`, fetcher)
+  const { data: ingresos } = useSWR(`/api/ingresos?${ingresosParams}`, fetcher)
   const { data: miembros } = useSWR('/api/miembros', fetcher)
 
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+  // Años disponibles: desde año actual -1 hasta +4 (cubre cuotas largas)
+  const anioBase = hoy.getFullYear()
+  const aniosDisponibles = Array.from({ length: 6 }, (_, i) => anioBase - 1 + i)
+
+  const isFuturo = anio > hoy.getFullYear() || (anio === hoy.getFullYear() && mes > hoy.getMonth() + 1)
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este gasto?')) return
@@ -65,6 +86,7 @@ export default function GastosContent() {
   const totalEjecutado = ejecutados.reduce((s: number, g: GastoRow) => s + g.monto, 0)
   const totalAhorros = ahorros.reduce((s: number, g: GastoRow) => s + g.monto, 0) + ahorrosProyectados.reduce((s: number, g: GastoRow) => s + g.monto, 0)
   const totalProyectado = proyectados.reduce((s: number, g: GastoRow) => s + g.monto, 0)
+  const totalIngresos = (ingresos ?? []).reduce((s: number, i: IngresoRow) => s + i.monto, 0)
 
   return (
     <div className="space-y-4">
@@ -83,7 +105,7 @@ export default function GastosContent() {
           value={anio}
           onChange={e => setAnio(+e.target.value)}
         >
-          {[anio - 1, anio, anio + 1].map(a => <option key={a} value={a}>{a}</option>)}
+          {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
         {miembros && (
           <select
@@ -115,8 +137,14 @@ export default function GastosContent() {
       </div>
 
       {/* Summary mini-cards */}
-      {gastos && gastos.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+      {(gastos || ingresos) && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white rounded-lg p-3 border border-green-100 shadow-sm">
+            <p className="text-xs text-gray-500 mb-1">
+              Ingresos{isFuturo ? ' proyectados' : ''}
+            </p>
+            <p className="text-base font-bold text-green-600">{formatearMoneda(totalIngresos)}</p>
+          </div>
           <div className="bg-white rounded-lg p-3 border border-red-100 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">Gastos ejecutados</p>
             <p className="text-base font-bold text-red-600">{formatearMoneda(totalEjecutado)}</p>
@@ -126,8 +154,41 @@ export default function GastosContent() {
             <p className="text-base font-bold text-emerald-600">{formatearMoneda(totalAhorros)}</p>
           </div>
           <div className="bg-white rounded-lg p-3 border border-amber-100 shadow-sm">
-            <p className="text-xs text-gray-500 mb-1">Proyectados (pendientes)</p>
+            <p className="text-xs text-gray-500 mb-1">Cuotas proyectadas</p>
             <p className="text-base font-bold text-amber-600">{formatearMoneda(totalProyectado)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Ingresos del período */}
+      {ingresos && ingresos.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 bg-green-50 border-b border-green-100 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-green-600" />
+            <h3 className="text-sm font-semibold text-green-800">
+              Ingresos {isFuturo ? 'proyectados' : 'del mes'} — {meses[mes - 1]} {anio}
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {ingresos.map((ing: IngresoRow) => (
+              <div key={ing.id} className={`px-5 py-2.5 flex items-center justify-between ${ing.virtual ? 'opacity-70' : ''}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-base">💵</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                      {ing.concepto}
+                      {ing.esRecurrente && <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Recurrente</span>}
+                      {ing.virtual && <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">Proyectado</span>}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: ing.miembro.color }} />
+                      {ing.miembro.nombre} · {formatearFecha(ing.fecha)}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-sm font-semibold text-green-600">+{formatearMoneda(ing.monto)}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -161,6 +222,9 @@ export default function GastosContent() {
                       {g.categorizacionAuto && (
                         <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-medium">Auto</span>
                       )}
+                      {g.virtual && (
+                        <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-medium">Proyectado</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-3">
@@ -183,25 +247,31 @@ export default function GastosContent() {
                     {g.categoria.esSaving ? '+' : '-'}{formatearMoneda(g.monto)}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleToggleEstado(g)}
-                      title={g.estado === 'EJECUTADO' ? 'Marcar como proyectado' : 'Marcar como ejecutado'}
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${
-                        g.estado === 'EJECUTADO'
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                      }`}
-                    >
-                      {g.estado === 'EJECUTADO' ? '✓ Ejecutado' : '⏳ Pendiente'}
-                    </button>
+                    {g.virtual ? (
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">⏳ Pendiente</span>
+                    ) : (
+                      <button
+                        onClick={() => handleToggleEstado(g)}
+                        title={g.estado === 'EJECUTADO' ? 'Marcar como proyectado' : 'Marcar como ejecutado'}
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${
+                          g.estado === 'EJECUTADO'
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                        }`}
+                      >
+                        {g.estado === 'EJECUTADO' ? '✓ Ejecutado' : '⏳ Pendiente'}
+                      </button>
+                    )}
                   </td>
                   <td className="px-6 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(g.id)}
-                      className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                    >
-                      Eliminar
-                    </button>
+                    {!g.virtual && (
+                      <button
+                        onClick={() => handleDelete(g.id)}
+                        className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        Eliminar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

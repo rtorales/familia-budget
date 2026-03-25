@@ -1,21 +1,11 @@
 'use client'
 import useSWR from 'swr'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, CreditCard, AlertTriangle, Clock, PiggyBank, Clock3 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, CreditCard, Clock, PiggyBank, Clock3 } from 'lucide-react'
 import { formatearMoneda, formatearFecha } from '@/lib/formatters'
 import Link from 'next/link'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
-
-interface AlertaItem {
-  categoriaId: string
-  categoriaIcono: string
-  categoriaNombre: string
-  nivel: string
-  gastado: number
-  presupuesto: number
-  porcentaje: number
-}
 
 interface GastoItem {
   id: string
@@ -45,7 +35,6 @@ export default function DashboardContent() {
 
   const { data: resumen } = useSWR(`/api/reportes/resumen?mes=${mes}&anio=${anio}`, fetcher)
   const { data: flujoCaja } = useSWR(`/api/reportes/flujo-caja?meses=6`, fetcher)
-  const { data: alertas } = useSWR(`/api/alertas?mes=${mes}&anio=${anio}`, fetcher)
   const { data: gastos } = useSWR(`/api/gastos?mes=${mes}&anio=${anio}`, fetcher)
   const { data: cuotas } = useSWR('/api/cuotas', fetcher)
 
@@ -122,29 +111,6 @@ export default function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      {/* Budget alerts */}
-      {alertas && alertas.length > 0 && (
-        <div className="space-y-2">
-          {alertas.map((alerta: AlertaItem) => (
-            <div
-              key={alerta.categoriaId}
-              className={`flex items-center gap-3 p-3 rounded-lg border text-sm font-medium ${
-                alerta.nivel === 'critico'
-                  ? 'bg-red-50 border-red-200 text-red-800'
-                  : 'bg-yellow-50 border-yellow-200 text-yellow-800'
-              }`}
-            >
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              <span>
-                {alerta.categoriaIcono} {alerta.categoriaNombre}:{' '}
-                {alerta.nivel === 'critico' ? '¡Presupuesto excedido!' : 'Cerca del límite'}
-                {' '}— {formatearMoneda(alerta.gastado)} de {formatearMoneda(alerta.presupuesto)} ({Math.round(alerta.porcentaje * 100)}%)
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* KPI Cards — 3 columns */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {kpis.map((kpi) => {
@@ -183,30 +149,36 @@ export default function DashboardContent() {
           </ResponsiveContainer>
         </div>
 
-        {/* Category pie chart */}
+        {/* Category pie chart — top 5 */}
         <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-          <h2 className="font-semibold text-gray-900 mb-4">Gastos por Categoría</h2>
-          {resumen.gastosPorCategoria?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={resumen.gastosPorCategoria}
-                  dataKey="total"
-                  nameKey="nombre"
-                  cx="50%" cy="50%"
-                  outerRadius={80}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  label={({ nombre, porcentaje }: any) => `${nombre} ${Math.round((porcentaje ?? 0) * 100)}%`}
-                  labelLine={false}
-                >
-                  {resumen.gastosPorCategoria.map((_: unknown, index: number) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => formatearMoneda(Number(v ?? 0))} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
+          <h2 className="font-semibold text-gray-900 mb-4">Top 5 Categorías</h2>
+          {resumen.gastosPorCategoria?.length > 0 ? (() => {
+            const sorted = [...resumen.gastosPorCategoria].sort((a: {total: number}, b: {total: number}) => b.total - a.total)
+            const top5 = sorted.slice(0, 5)
+            const otrosTotal = sorted.slice(5).reduce((s: number, c: {total: number}) => s + c.total, 0)
+            const pieData = otrosTotal > 0 ? [...top5, { nombre: 'Otros', total: otrosTotal, porcentaje: otrosTotal / (resumen.totalGastos || 1) }] : top5
+            return (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="total"
+                    nameKey="nombre"
+                    cx="50%" cy="50%"
+                    outerRadius={80}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    label={({ nombre, porcentaje }: any) => `${nombre} ${Math.round((porcentaje ?? 0) * 100)}%`}
+                    labelLine={false}
+                  >
+                    {pieData.map((_: unknown, index: number) => (
+                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => formatearMoneda(Number(v ?? 0))} />
+                </PieChart>
+              </ResponsiveContainer>
+            )
+          })() : (
             <p className="text-sm text-gray-400 text-center py-8">Sin gastos este mes</p>
           )}
         </div>

@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   }
   if (miembroId) conditions.push(eq(ingreso.miembroId, miembroId))
 
-  const ingresos = await db.select({
+  const ingresosDB = await db.select({
     id: ingreso.id,
     miembroId: ingreso.miembroId,
     concepto: ingreso.concepto,
@@ -49,7 +49,55 @@ export async function GET(req: Request) {
     .where(and(...conditions))
     .orderBy(desc(ingreso.fecha))
 
-  return NextResponse.json(ingresos)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resultado: any[] = ingresosDB.map(i => ({ ...i, virtual: false }))
+
+  // Para meses futuros (hasta dic 2026), proyectar ingresos recurrentes
+  const now = new Date()
+  const currentYM = now.getFullYear() * 12 + now.getMonth()
+  const targetYM = anio && mes ? anio * 12 + (mes - 1) : null
+  const esMesFuturo = targetYM !== null && targetYM > currentYM
+  const MAX_ANIO = 2026
+
+  if (esMesFuturo && anio && anio <= MAX_ANIO) {
+    // Obtener todos los ingresos recurrentes de los últimos 3 meses
+    const tresAtras = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+    const recurrentes = await db.select({
+      id: ingreso.id,
+      miembroId: ingreso.miembroId,
+      concepto: ingreso.concepto,
+      monto: ingreso.monto,
+      esRecurrente: ingreso.esRecurrente,
+      creadoEn: ingreso.creadoEn,
+      miembro: { id: miembro.id, nombre: miembro.nombre, color: miembro.color },
+    })
+      .from(ingreso)
+      .innerJoin(miembro, eq(ingreso.miembroId, miembro.id))
+      .where(and(
+        eq(miembro.familiaId, user.familiaId),
+        eq(ingreso.esRecurrente, true),
+        gte(ingreso.fecha, tresAtras),
+      ))
+      .orderBy(desc(ingreso.fecha))
+
+    // Tomar el más reciente por miembro+concepto (deduplicar)
+    const seen = new Set<string>()
+    for (const rec of recurrentes) {
+      const key = `${rec.miembroId}-${rec.concepto}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      if (miembroId && rec.miembroId !== miembroId) continue
+
+      resultado.push({
+        ...rec,
+        id: `virtual-ing-${rec.id}-${mes}-${anio}`,
+        fecha: new Date(anio, mes! - 1, 5),
+        virtual: true,
+      })
+    }
+  }
+
+  return NextResponse.json(resultado)
 }
 
 export async function POST(req: Request) {
