@@ -34,13 +34,15 @@ export async function GET(req: Request) {
     .where(and(gte(gasto.fecha, inicio), lte(gasto.fecha, fin), eq(miembro.familiaId, user.familiaId)))
 
   // Split into buckets
-  let totalGastos = 0      // EJECUTADO, NOT saving → operativo
-  let totalAhorros = 0     // EJECUTADO, IS saving → inversiones/ahorros
-  let totalProyectado = 0  // PROYECTADO (any category)
+  let totalGastos = 0             // EJECUTADO, NOT saving → operativo
+  let totalAhorros = 0            // EJECUTADO, IS saving → inversiones/ahorros
+  let totalProyectado = 0         // PROYECTADO, NOT saving → gastos pendientes
+  let totalAhorrosProyectado = 0  // PROYECTADO, IS saving → ahorros pendientes
 
   for (const row of gastosRows) {
     if (row.estado === 'PROYECTADO') {
-      totalProyectado += row.monto
+      if (row.esSaving) totalAhorrosProyectado += row.monto
+      else totalProyectado += row.monto
     } else if (row.esSaving) {
       totalAhorros += row.monto
     } else {
@@ -122,7 +124,8 @@ export async function GET(req: Request) {
     totalIngresos,
     totalGastos,           // operativos ejecutados este mes
     totalAhorros,          // ahorros/inversiones este mes
-    totalProyectado,       // comprometidos pendientes este mes
+    totalProyectado,            // comprometidos pendientes este mes (no saving)
+    totalAhorrosProyectado,     // ahorros/inversiones proyectados pendientes
     saldoLiquido: saldoLiquidoReal,  // balance acumulado real
     saldoFondosMutuos,     // balance fondos mutuos (stored in configuracion)
     balance: saldoLiquidoReal, // kept for backward compat

@@ -21,7 +21,6 @@ const navItems = [
   { href: '/gastos', label: 'Gastos', icon: TrendingDown },
   { href: '/ingresos', label: 'Ingresos', icon: TrendingUp },
   { href: '/cuotas', label: 'Cuotas', icon: CreditCard },
-  { href: '/presupuestos', label: 'Presupuestos', icon: Wallet },
   { href: '/escaner', label: 'Escanear Ticket', icon: Camera },
   { href: '/reportes', label: 'Reportes', icon: BarChart3 },
   { href: '/configuracion', label: 'Configuración', icon: Settings },

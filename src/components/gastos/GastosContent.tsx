@@ -60,9 +60,10 @@ export default function GastosContent() {
   // Totals
   const ejecutados = (gastos ?? []).filter((g: GastoRow) => g.estado === 'EJECUTADO' && !g.categoria.esSaving)
   const ahorros = (gastos ?? []).filter((g: GastoRow) => g.estado === 'EJECUTADO' && g.categoria.esSaving)
-  const proyectados = (gastos ?? []).filter((g: GastoRow) => g.estado === 'PROYECTADO')
+  const proyectados = (gastos ?? []).filter((g: GastoRow) => g.estado === 'PROYECTADO' && !g.categoria.esSaving)
+  const ahorrosProyectados = (gastos ?? []).filter((g: GastoRow) => g.estado === 'PROYECTADO' && g.categoria.esSaving)
   const totalEjecutado = ejecutados.reduce((s: number, g: GastoRow) => s + g.monto, 0)
-  const totalAhorros = ahorros.reduce((s: number, g: GastoRow) => s + g.monto, 0)
+  const totalAhorros = ahorros.reduce((s: number, g: GastoRow) => s + g.monto, 0) + ahorrosProyectados.reduce((s: number, g: GastoRow) => s + g.monto, 0)
   const totalProyectado = proyectados.reduce((s: number, g: GastoRow) => s + g.monto, 0)
 
   return (

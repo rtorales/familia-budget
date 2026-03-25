@@ -94,7 +94,9 @@ export default function DashboardContent() {
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
       border: 'border-emerald-100',
-      sub: 'Saldo acumulado fondos mutuos',
+      sub: resumen.totalAhorrosProyectado > 0
+        ? `+ ${formatearMoneda(resumen.totalAhorrosProyectado)} proyectados`
+        : 'Saldo acumulado fondos mutuos',
     },
     {
       label: 'Comprometido',
